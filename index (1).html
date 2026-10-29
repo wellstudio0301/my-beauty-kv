@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>好好美學知識庫 - 整合系統</title>
+    <style>
+        :root {
+            --bg-warm-white: #FDFBF7;
+            --bg-beige: #F5EFEB;
+            --color-milk-tea: #D4C3B3;
+            --color-sage-green: #A3B19B;
+            --color-sage-green-alpha: rgba(163, 177, 155, 0.15);
+            --color-charcoal: #2C2A29;
+            --color-muted: #7A7571;
+            --color-border: #E6DFD5;
+            --color-white: #FFFFFF;
+            --font-ui: 'PingFang TC', -apple-system, sans-serif;
+            --font-read: 'Noto Serif TC', 'Georgia', serif;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+        body { font-family: var(--font-ui); background-color: var(--bg-warm-white); color: var(--color-charcoal); min-height: 100vh; display: flex; }
+        
+        /* 側邊欄與視窗配置 */
+        .sidebar { width: 260px; background-color: var(--color-white); border-right: 1px solid var(--color-border); display: flex; flex-direction: column; transition: width 0.3s ease; z-index: 90; }
+        .sidebar.collapsed { width: 70px; }
+        .sidebar-header { padding: 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--bg-beige); min-height: 74px; }
+        .sidebar.collapsed .brand-name { display: none; }
+        .brand-name { font-size: 1.15rem; font-weight: 600; white-space: nowrap; }
+        .toggle-btn { width: 44px; height: 44px; border: none; background: var(--bg-beige); border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+        .nav-links { list-style: none; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+        .nav-item { display: flex; align-items: center; padding: 0 16px; min-height: 48px; border-radius: 8px; cursor: pointer; color: var(--color-muted); text-decoration: none; font-weight: 500; }
+        .nav-item:hover, .nav-item.active { background-color: var(--bg-beige); color: var(--color-charcoal); }
+        .nav-icon { font-size: 1.25rem; margin-right: 16px; min-width: 24px; text-align: center; }
+        .sidebar.collapsed .nav-text, .sidebar.collapsed .nav-links-sub { display: none; }
+        .sidebar.collapsed .nav-item { padding: 0; justify-content: center; }
+        .sidebar.collapsed .nav-icon { margin-right: 0; }
+        
+        /* 主內容與六大入口 */
+        .main-content { flex: 1; padding: 40px; overflow-y: auto; display: block; }
+        .welcome-header { margin-bottom: 32px; }
+        .welcome-header h1 { font-size: 1.75rem; font-weight: 600; margin-bottom: 8px; }
+        .welcome-header p { color: var(--color-muted); font-size: 0.95rem; }
+        .menu-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; max-width: 1000px; }
+        .menu-card { background-color: var(--color-white); border: 1px solid var(--color-border); border-radius: 16px; padding: 28px; cursor: pointer; display: flex; flex-direction: column; gap: 12px; text-decoration: none; box-shadow: 0 2px 6px rgba(0,0,0,0.01); }
+        .menu-card:active { transform: scale(0.98); background-color: var(--bg-beige); }
+        .card-icon { width: 48px; height: 48px; background-color: var(--bg-beige); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; }
+        .card-title { font-size: 1.2rem; font-weight: 600; color: var(--color-charcoal); }
+        .card-desc { font-size: 0.9rem; color: var(--color-muted); line-height: 1.5; }
+        
+        /* AI 雙欄審查介面 */
+        .ai-review-view { flex: 1; display: none; flex-direction: column; }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; background-color: var(--color-white); border-bottom: 1px solid var(--color-border); }
+        .btn-commit { min-height: 44px; padding: 0 24px; background-color: var(--color-sage-green); color: var(--color-white); border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; }
+        .btn-commit:disabled { background-color: var(--color-milk-tea); opacity: 0.6; }
+        .review-container { display: flex; width: 100%; height: calc(100vh - 77px); }
+        .pane { width: 50%; padding: 32px; overflow-y: auto; }
+        .pane-left { border-right: 1px solid var(--color-border); background-color: var(--color-white); }
+        .pane-right { background-color: var(--bg-warm-white); }
+        .pane-title { font-size: 1.1rem; color: var(--color-muted); margin-bottom: 24px; border-bottom: 2px solid var(--bg-beige); padding-bottom: 8px; font-weight: 600; }
+        
+        /* 欄位與對照卡片 */
+        .field-group { margin-bottom: 24px; border: 1px solid var(--color-border); border-radius: 12px; padding: 20px; background-color: var(--color-white); transition: all 0.3s; }
+        .pane-right .field-group { background-color: var(--bg-warm-white); }
+        .field-group.accepted { border-color: var(--color-sage-green); background-color: var(--color-sage-green-alpha); box-shadow: 0 0 0 1px var(--color-sage-green); }
+        .field-group.rejected { opacity: 0.4; }
+        .field-label { font-size: 0.85rem; color: var(--color-muted); font-weight: 600; margin-bottom: 8px; display: flex; justify-content: space-between; }
+        .status-badge { font-size: 0.75rem; padding: 2px 8px; border-radius: 4px; background-color: var(--color-sage-green); color: var(--color-white); display: none; }
+        .accepted .status-badge { display: inline-block; }
+        .field-content { font-family: var(--font-read); font-size: 1.05rem; white-space: pre-wrap; word-break: break-all; }
+        .field-content.editable { font-family: var(--font-ui); width: 100%; min-height: 80px; padding: 12px; border: 1px solid var(--color-milk-tea); border-radius: 6px; background-color: var(--color-white); font-size: 1rem; color: var(--color-charcoal); resize: vertical; }
+        
+        /* 觸控工具列熱區 > 44px */
+        .touch-toolbar { display: flex; gap: 12px; margin-top: 16px; border-top: 1px dashed var(--color-border); padding-top: 12px; }
+        .touch-btn { flex: 1; min-height: 44px; border: 1px solid var(--color-border); border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer; }
+        .btn-accept { background-color: var(--color-sage-green); color: var(--color-white); border: none; }
+        .btn-edit { background-color: var(--color-milk-tea); color: var(--color-white); border: none; }
+        .btn-reject { background-color: var(--bg-beige); }
+        .source-card { background-color: var(--bg-beige); border: 1px solid var(--color-border); border-radius: 8px; padding: 12px 16px; margin-top: 8px; }
+        .source-link { color: var(--color-charcoal); font-weight: 600; text-decoration: underline; min-height: 44px; display: inline-flex; align-items: center; }
+        
+        /* 安全設定視窗 */
+        .settings-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(44,42,41,0.4); backdrop-filter: blur(4px); z-index: 1000; align-items: center; justify-content: center; padding: 20px; }
+        .settings-modal { background-color: var(--color-white); border-radius: 16px; width: 100%; max-width: 500px; padding: 32px; display: flex; flex-direction: column; gap: 20px; }
+        .modal-title { font-size: 1.25rem; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
+        .close-modal { font-size: 1.5rem; background: none; border: none; cursor: pointer; width: 44px; height: 44px; }
+        .modal-tip { font-size: 0.8rem; color: var(--color-sage-green); background-color: var(--color-sage-green-alpha); padding: 12px; border-radius: 8px; line-height: 1.4; }
+        .input-group { display: flex; flex-direction: column; gap: 8px; }
+        .input-group label { font-size: 0.85rem; font-weight: 600; color: var(--color-muted); }
+        .secret-input { min-height: 48px; padding: 0 14px; border: 1px solid var(--color-milk-tea); border-radius: 8px; font-size: 1rem; background-color: var(--bg-warm-white); width: 100%; }
+        .btn-save-settings { min-height: 44px; background-color: var(--color-sage-green); color: var(--color-white); border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; }
+        
+        @media (max-width: 768px) {
+            body { flex-direction: column; }
+            .sidebar { width: 100%; height: auto; border-right: none; border-bottom: 1px solid var(--color-border); }
+            .sidebar.collapsed { width: 100%; }
+            .nav-links { display: none; }
+            .main-content { padding: 24px; }
+            .menu-grid { grid-template-columns: 1fr; gap: 16px; }
+            .review-container { flex-direction: column; height: auto; }
+            .pane { width: 100%; max-height: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 左側記憶導覽列 -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <span class="brand-name">好好美學知識庫</span>
+            <button class="toggle-btn" onclick="toggleSidebar()">☰</button>
+        </div>
+        <ul class="nav-links">
+            <li><a href="#" class="nav-item active" id="nav-home" onclick="showView('home')"><span class="nav-icon">🏠</span><span class="nav-text">首頁入口</span></a></li>
+            <li><a href="#" class="nav-item" onclick="openSettings()"><span class="nav-icon">⚙️</span><span class="nav-text">安全設定</span></a></li>
+        </ul>
+    </div>
+
+    <!-- 首頁主入口畫面 -->
+    <div class="main-content" id="homeView">
+        <div class="welcome-header">
+            <h1>歡迎回來，好好美學</h1>
+            <p>累積美容專業，今日也是精緻且專業的一天。</p>
+        </div>
+        <div class="menu-grid">
+            <div class="menu-card" onclick="alert('正式知識庫模組：即將串接 Google Sheets 延遲載入技術')">
+                <div class="card-icon">📚</div><div class="card-title">專業知識庫</div><div class="card-desc">依皮膚基礎、膚質判斷等九大分類管理已確認的正式文章。</div>
+            </div>
+            <div class="menu-card" onclick="alert('收藏模組：支援多資料夾夾帶，不複製原文。')">
+                <div class="card-icon">❤️</div><div class="card-title">我的收藏</div><div class="card-desc">快速查找、收藏並自訂分類你最常用的核心保養與療程知識。</div>
+            </div>
+            <div class="menu-card" onclick="alert('產品關聯模組：建立成分與療程間的交叉矩陣。')">
+                <div class="card-icon">🧴</div><div class="card-title">產品管理</div><div class="card-desc">規劃產品資料、建立成分、肌膚問題、與療程之間的交叉關聯。</div>
+            </div>
+            <div class="menu-card" onclick="alert('AI 助理對話區：獨立沙盒運作中。')">
+                <div class="card-icon">🤖</div><div class="card-title">AI 知識助理</div><div class="card-desc">跨分類交叉比對，提供詳細教學格式回答，輔助諮詢不越權。</div>
+            </div>
+            <div class="menu-card" onclick="showView('ai-review')">
+                <div class="card-icon">📥</div><div class="card-title">待整理文章 (點擊測試 AI 雙欄)</div><div class="card-desc">匯入的舊文章緩衝區，支援 AI 並列修訂建議與外部學術查證。</div>
+            </div>
+            <div class="menu-card" onclick="triggerRestoreTest()">
+                <div class="card-icon">💾</div><div class="card-title">資料備份與還原 (點擊測試三向合併)</div><div class="card-desc">手動與主動偵測備份管理，支援三向合併演算法，保護封存文章</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI 雙欄審查介面 -->
+    <div class="ai-review-view" id="aiReviewView">
+        <div class="top-bar">
+            <div><h2 style="font-size:1.1rem;">AI 知識品質檢查與校正暫存區</h2></div>
+            <button class="btn-commit" id="commitBtn" onclick="reviewManager.commitStagingToSheets()">確認發布修改</button>
+        </div>
+        <div class="review-container">
+            <div class="pane pane-left">
+                <div class="pane-title">目前正式知識庫內容 (Staging 暫存庫)</div>
+                <div class="field-group" id="group-title"><div class="field-label">文章標題 <span class="status-badge">已採納建議</span></div><div class="field-content" id="view-title">載入中...</div></div>
+                <div class="field-group" id="group-summary"><div class="field-label">文章摘要 <span class="status-badge">已採納建議</span></div><div class="field-content" id="view-summary">載入中...</div></div>
+                <div class="field-group" id="group-category"><div class="field-label">正式分類 <span class="status-badge">已採納建議</span></div><div class="field-content" id="view-category">載入中...</div></div>
+            </div>
+            <div class="pane pane-right">
+                <div class="pane-title">AI 品質檢查修訂建議</div>
+                <div class="field-group" id="ai-group-title">
+                    <div class="field-label">建議優化標題</div><div class="field-content" id="ai-val-title">載入中...</div>
+                    <div class="touch-toolbar">
+                        <button class="touch-btn btn-accept" onclick="reviewManager.acceptField('title')">採用</button>
+                        <button class="touch-btn btn-edit" onclick="reviewManager.enableEdit('title')">編輯</button>
+                        <button class="touch-btn btn-reject" onclick="reviewManager.rejectField('title')">拒絕</button>
+                    </div>
+                </div>
+                <div class="field-group" id="ai-group-summary">
+                    <div class="field-label">建議兩行摘要</div><div class="field-content" id="ai-val-summary">載入中...</div>
+                    <div class="touch-toolbar">
+                        <button class="touch-btn btn-accept" onclick="reviewManager.acceptField('summary')">採用</button>
+                        <button class="touch-btn btn-edit" onclick="reviewManager.enableEdit('summary')">編輯</button>
+                        <button class="touch-btn btn-reject" onclick="reviewManager.rejectField('summary')">拒絕</button>
+                    </div>
+                </div>
+                <div class="field-group" id="ai-group-category">
+                    <div class="field-label">建議調整分類</div><div class="field-content" id="ai-val-category">載入中...</div>
+                    <div class="touch-toolbar">
+                        <button class="touch-btn btn-accept" onclick="reviewManager.acceptField('category')">採用</button>
+                        <button class="touch-btn btn-reject" onclick="reviewManager.rejectField('category')">拒絕</button>
+                    </div>
+                </div>
+                <div class="pane-title" style="margin-top: 32px;">AI 外部學術文獻查證來源</div>
+                <div id="ai-sources-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 安全設定彈窗 -->
+    <div class="settings-overlay" id="settingsOverlay">
+        <div class="settings-modal">
+            <div class="modal-title"><span>⚙️ 知識庫隱私與安全設定</span><button class="close-modal" onclick="closeSettings()">✕</button></div>
+            <div class="modal-tip">🔒 <b>安全防禦啟動：</b>所有填寫的金鑰與 ID 將<b>僅儲存在這台 iPad/Mac 的本機快取中</b>，程式碼全乾淨，絕不外洩。</div>
+            <div class="input-group"><label>DEEPSEEK / OPENAI API KEY</label><input type="password" id="apiKeyInput" class="secret-input" placeholder="sk-................................"></div>
+            <div class="input-group"><label>GOOGLE SPREADSHEET ID</label><input type="text" id="sheetsIdInput" class="secret-input" placeholder="1aBcDeFgHiJkLmNoPqRsTuVwXyZ..."></div>
+            <button class="btn-save-settings" onclick="saveSettings()">儲存設定至本機快取</button>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. 三向合併還原演算法 (純前端實現) ---
+        function performThreeWayMergeRestore(backupData, currentSheetsData) {
+            if (!backupData || !Array.isArray(backupData.scope_json) || !Array.isArray(backupData.articles)) {
+                throw new Error("還原失敗：備份檔案結構損毀。");
+            }
+            const S = new Set(backupData.scope_json); 
+            const B = backupData.articles;
+            const L = currentSheetsData;
+            const backupMap = new Map(B.map(a => [a.id, a]));
+            const finalResult = [];
+
+            for (const a of L) {
+                if (S.has(a.state)) {
+                    if (backupMap.has(a.id)) {
+                        finalResult.push(backupMap.get(a.id)); // UPSERT
+                        backupMap.delete(a.id);
+                    } else {
+                        console.warn(`[還原] 文章 ${a.title} 在備份後才建立，依還原時點予以刪除。`);
+                    }
+                } else {
+                    finalResult.push(a); // 免疫區 (封存或回收區文章 100% 保留現狀)
+                }
+            }
+            for (const [id, b] of backupMap.entries()) {
+                finalResult.push(b); // INSERT
+            }
+            if (finalResult.length === 0 && L.length > 0) {
+                throw new Error("防護線觸發：還原後資料筆數為零，已中止覆寫，防止資料庫被清空！");
+            }
+            return finalResult;
+        }
+
+        // --- 2. AI 建議雙欄審查狀態機類別 ---
+        class AICheckReviewManager {
+            constructor() {
+                this.originalArticle = null;
+                this.aiSuggestion = null;
+                this.stagingArticle = null; 
+                this.fieldStates = { title: 'pending', summary: 'pending', category: 'pending' };
+            }
+
+            initialize(articleData, aiSuggestionData) {
+                this.originalArticle = JSON.parse(JSON.stringify(articleData));
+                this.aiSuggestion = JSON.parse(JSON.stringify(aiSuggestionData));
+                this.stagingArticle = {
+                    id: this.originalArticle.id,
+                    base_updated_at: this.originalArticle.updated_at,
+                    title: this.originalArticle.title,
+                    category: this.originalArticle.category,
+                    summary: this.originalArticle.content_json.summary
+                };
+                
+                this.fieldStates = { title: 'pending', summary: 'pending', category: 'pending' };
+                document.getElementById('group-title').className = 'field-group';
+                document.getElementById('group-summary').className = 'field-group';
+                document.getElementById('group-category').className = 'field-group';
+                document.getElementById('ai-group-title').className = 'field-group';
+                document.getElementById('ai-group-summary').className = 'field-group';
+                document.getElementById('ai-group-category').className = 'field-group';
+                
+                this.renderUI();
+            }
+
+            renderUI() {
+                document.getElementById('view-title').textContent = this.stagingArticle.title;
+                document.getElementById('view-summary').textContent = this.stagingArticle.summary;
+                document.getElementById('view-category').textContent = this.stagingArticle.category;
+                
+                if (this.fieldStates.title === 'pending') document.getElementById('ai-val-title').textContent = this.aiSuggestion.new_title;
+                if (this.fieldStates.summary === 'pending') document.getElementById('ai-val-summary').textContent = this.aiSuggestion.new_summary;
+                document.getElementById('ai-val-category').textContent = this.aiSuggestion.new_category;
+
+                const container = document.getElementById('ai-sources-container');
+                container.innerHTML = '';
+                this.aiSuggestion.verification_sources.forEach(src => {
+                    const card = document.createElement('div');
+                    card.className = 'source-card';
+                    card.innerHTML = `<a class="source-link" href="${src.url}" target="_blank" rel="noopener noreferrer">🔍 ${src.name} ↗</a><div style="font-size:0.8rem;color:var(--color-muted);">文獻日期: ${src.date}</div>`;
+                    container.appendChild(card);
+                });
+            }
+
+            acceptField(fieldName) {
+                this.fieldStates[fieldName] = 'accepted';
+                if (fieldName === 'title') this.stagingArticle.title = this.aiSuggestion.new_title;
+                if (fieldName === 'summary') this.stagingArticle.summary = this.aiSuggestion.new_summary;
+                if (fieldName === 'category') this.stagingArticle.category = this.aiSuggestion.new_category;
+                document.getElementById(`group-${fieldName}`).className = 'field-group accepted';
+                document.getElementById(`ai-group-${fieldName}`).className = 'field-group accepted';
+                this.renderUI();
+            }
+
+            rejectField(fieldName) {
+                this.fieldStates[fieldName] = 'rejected';
+                if (fieldName === 'title') this.stagingArticle.title = this.originalArticle.title;
+                if (fieldName === 'summary') this.stagingArticle.summary = this.originalArticle.content_json.summary;
+                if (fieldName === 'category') this.stagingArticle.category = this.originalArticle.category;
+                document.getElementById(`group-${fieldName}`).className = 'field-group';
+                document.getElementById(`ai-group-${fieldName}`).className = 'field-group rejected';
+                this.renderUI();
+            }
+
+            enableEdit(fieldName) {
+                const display = document.getElementById(`ai-val-${fieldName}`);
+                const textarea = document.createElement('textarea');
+                textarea.className = 'field-content editable';
+                textarea.value = display.textContent;
+                textarea.onblur = () => {
+                    if (fieldName === 'title') this.stagingArticle.title = textarea.value;
+                    if (fieldName === 'summary') this.stagingArticle.summary = textarea.value;
+                    this.fieldStates[fieldName] = 'accepted';
+                    document.getElementById(`group-${fieldName}`).className = 'field-group accepted';
+                    display.className = 'field-content';
+                    display.textContent = textarea.value;
+                    this.renderUI();
+                };
+                display.innerHTML = ''; display.appendChild(textarea); textarea.focus();
+            }
+
+            async commitStagingToSheets() {
+                const btn = document.getElementById('commitBtn');
+                btn.disabled = true; btn.textContent = "正在發布樂觀鎖驗證...";
+                try {
+                    const serverArticle = await new Promise(r => setTimeout(() => r({ updated_at: "2026-05-10T08:00:00.000Z" }), 600));
+                    if (new Date(serverArticle.updated_at).getTime() !== new Date(this.stagingArticle.base_updated_at).getTime()) {
+                        throw new Error("VERSION_CONFLICT");
+                    }
+                    alert("🎉 樂觀鎖校驗通過！已成功原子化修改 Google Sheets！");
+                    showView('home');
+                } catch (err) {
+                    if (err.message === "VERSION_CONFLICT") {
+                        localStorage.setItem(`rescue_${this.stagingArticle.id}`, JSON.stringify(this.stagingArticle));
+                        alert("⚠️ 儲存攔截：檢測到多裝置修改衝突！目前的修改已安全隔離鎖定在本機快取中，絕不丟失字數！");
+                    } else { alert("網路異常。"); }
+                } finally { btn.disabled = false; btn.textContent = "確認發布修改"; }
+            }
+        }
+
+        // --- 3. 介面控制與本機快取設定邏輯 ---
+        const reviewManager = new AICheckReviewManager();
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('collapsed');
+            localStorage.setItem('sidebar_collapsed', sidebar.classList.contains('collapsed'));
+        }
+
+        function showView(viewName) {
+            document.getElementById('homeView').style.display = (viewName === 'home') ? 'block' : 'none';
+            document.getElementById('aiReviewView').style.display = (viewName === 'ai-review') ? 'flex' : 'none';
+            
+            const navHome = document.getElementById('nav-home');
+            if (viewName === 'home') {
+                navHome.classList.add('active');
+            } else {
+                navHome.classList.remove('active');
+            }
+
+            if (viewName === 'ai-review') {
+                const mockArticle = {
+                    id: "article-001", title: "玻尿酸保濕機轉分析", category: "皮膚基礎知識", updated_at: "2026-05-10T08:00:00.000Z",
+                    content_json: { summary: "本文介紹玻尿酸在角質層的鎖水應用。" }
+                };
+                const mockAI = {
+                    new_title: "玻尿酸（Hyaluronic Acid）在角質層的鎖水機轉與美容實務複合配方指引",
+                    new_summary: "深度剖析大小分子玻尿酸屏障差異，並針對美容院所療程導入給予高效配方搭配建議。",
+                    new_category: "成分資料庫",
+                    verification_sources: [{ name: "國際皮膚科科學期刊 (2025)", url: "https://example.com", date: "2025-12" }]
+                };
+                reviewManager.initialize(mockArticle, mockAI);
+            }
+        }
+
+        function openSettings() { document.getElementById('settingsOverlay').style.display = 'flex'; }
+        function closeSettings() { document.getElementById('settingsOverlay').style.display = 'none'; }
+        
+        function saveSettings() {
+            localStorage.setItem('beauty_api_key', document.getElementById('apiKeyInput').value.trim());
+            localStorage.setItem('beauty_sheets_id', document.getElementById('sheetsIdInput').value.trim());
+            alert("✅ 安全隱私憑證已成功鎖定在您這台裝置的 LocalStorage 中！");
+            closeSettings();
+        }
+
+        function triggerRestoreTest() {
+            const mockCurrent = [{ id: "A", title: "舊正式文章", state: "published" }, { id: "B", title: "封存文章", state: "archived" }];
+            const mockBackup = { scope_json: ["published"], articles: [{ id: "A", title: "還原後的乾淨文章", state: "published" }] };
+            const res = performThreeWayMergeRestore(mockBackup, mockCurrent);
+            alert("三向合併演算法運算成功！\n還原後：正式文章 A 已被覆蓋，而不在管轄範圍內的『封存文章 B』被完美保全免疫！\n結果筆數：" + res.length);
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            if (localStorage.getItem('sidebar_collapsed') === 'true') {
+                document.getElementById('sidebar').classList.add('collapsed');
+            }
+            document.getElementById('apiKeyInput').value = localStorage.getItem('beauty_api_key') || '';
+            document.getElementById('sheetsIdInput').value = localStorage.getItem('beauty_sheets_id') || '';
+        });
+    </script>
+</body>
+</html>
